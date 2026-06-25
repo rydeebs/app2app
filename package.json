@@ -6,18 +6,32 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "cap:sync": "cap sync ios",
+    "ios": "cap open ios"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.105.0",
+    "@capacitor/app": "^7.1.2",
+    "@capacitor/core": "^7.6.7",
+    "@capacitor/local-notifications": "^7.0.6",
+    "@supabase/ssr": "^0.12.0",
+    "@supabase/supabase-js": "^2.108.2",
     "next": "16.2.9",
     "react": "19.2.4",
-    "react-dom": "19.2.4"
+    "react-dom": "19.2.4",
+    "react-markdown": "^10.1.0",
+    "web-push": "^3.6.7",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@capacitor/cli": "^7.6.7",
+    "@capacitor/ios": "^7.6.7",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@types/web-push": "^3.6.4",
     "eslint": "^9",
     "eslint-config-next": "16.2.9",
     "tailwindcss": "^4",
