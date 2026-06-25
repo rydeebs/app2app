@@ -6,9 +6,15 @@ import { DeleteAccountButton } from "@/components/DeleteAccountButton";
 
 export default async function Hub() {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+
+  let user = null;
+  try {
+    const { data } = await supabase.auth.getUser();
+    user = data.user;
+  } catch {
+    // Auth/network failure — send to login rather than crashing the render.
+    redirect("/login");
+  }
   if (!user) redirect("/login");
 
   const { data: apps } = await supabase
@@ -40,7 +46,7 @@ export default async function Hub() {
       ) : (
         <ul className="grid grid-cols-2 gap-3">
           {apps.map((app) => {
-            const icon = app.icon as { emoji?: string; color?: string };
+            const icon = (app.icon ?? {}) as { emoji?: string; color?: string };
             return (
               <li key={app.id}>
                 <Link
