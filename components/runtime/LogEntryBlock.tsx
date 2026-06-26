@@ -19,31 +19,37 @@ export function LogEntryBlock({ title, metricKey, fields, photoImport, metricUni
   const [saved, setSaved] = useState(false);
   const [importing, setImporting] = useState(false);
   const [importError, setImportError] = useState("");
+  const [photoCount, setPhotoCount] = useState(0);
   const fileRef = useRef<HTMLInputElement>(null);
 
   async function onPhoto(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    e.target.value = ""; // allow re-selecting the same file
-    if (!file) return;
+    const files = Array.from(e.target.files ?? []);
+    e.target.value = ""; // allow re-selecting the same file(s)
+    if (files.length === 0) return;
     setImportError("");
+    setPhotoCount(files.length);
     setImporting(true);
     try {
-      const { base64, mediaType } = await fileToInlineImage(file);
+      const images = await Promise.all(files.map((f) => fileToInlineImage(f)));
       const res = await fetch("/api/extract", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ fields, image: base64, mediaType }),
+        body: JSON.stringify({ fields, images }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Could not read photo");
+      if (!res.ok) throw new Error(data.error || "Could not read photos");
       const extracted = (data.values ?? {}) as Record<string, string>;
       if (Object.keys(extracted).length === 0) {
-        setImportError("Couldn't read any stats from that photo — enter them manually.");
+        setImportError(
+          files.length > 1
+            ? "Couldn't read any stats from those photos — enter them manually."
+            : "Couldn't read any stats from that photo — enter them manually."
+        );
       } else {
         setValues((p) => ({ ...p, ...extracted }));
       }
     } catch (err) {
-      setImportError(err instanceof Error ? err.message : "Could not read photo");
+      setImportError(err instanceof Error ? err.message : "Could not read photos");
     } finally {
       setImporting(false);
     }
@@ -92,6 +98,7 @@ export function LogEntryBlock({ title, metricKey, fields, photoImport, metricUni
               ref={fileRef}
               type="file"
               accept="image/*"
+              multiple
               onChange={onPhoto}
               className="hidden"
             />
@@ -100,7 +107,11 @@ export function LogEntryBlock({ title, metricKey, fields, photoImport, metricUni
               disabled={importing}
               className="flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-border bg-background px-4 py-2.5 text-sm text-muted transition hover:border-primary hover:text-foreground disabled:opacity-50"
             >
-              {importing ? "Reading photo…" : "📷 Import from photo"}
+              {importing
+                ? photoCount > 1
+                  ? `Reading ${photoCount} photos…`
+                  : "Reading photo…"
+                : "📷 Import from photos"}
             </button>
             {importError ? <p className="text-xs text-danger">{importError}</p> : null}
           </>
@@ -112,7 +123,7 @@ export function LogEntryBlock({ title, metricKey, fields, photoImport, metricUni
               {f.unit ? ` (${f.unit})` : f.kind === "duration" ? " (mm:ss)" : ""}
             </span>
             <input
-              type={f.kind === "number" ? "number" : "text"}
+              type={f.kind === "number" ? "number" : f.kind === "date" ? "date" : "text"}
               inputMode={f.kind === "number" ? "decimal" : undefined}
               value={values[f.key] ?? ""}
               onChange={(e) => setValues((p) => ({ ...p, [f.key]: e.target.value }))}

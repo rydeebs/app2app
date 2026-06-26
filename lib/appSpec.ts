@@ -9,9 +9,14 @@ import { z } from "zod";
 
 const DayEnum = z.enum(["mon", "tue", "wed", "thu", "fri", "sat", "sun"]);
 
+// Optional grouping label. When set, the runtime groups components into a tab
+// bar (e.g. "Today", "Progress", "Plan"). Apps without tabs render as one feed.
+const tab = z.string().optional();
+
 const MarkdownComponent = z.object({
   type: z.literal("markdown"),
   id: z.string(),
+  tab,
   title: z.string().optional(),
   content: z.string(),
 });
@@ -19,6 +24,7 @@ const MarkdownComponent = z.object({
 const ScheduleComponent = z.object({
   type: z.literal("schedule"),
   id: z.string(),
+  tab,
   title: z.string(),
   items: z.array(
     z.object({
@@ -33,6 +39,7 @@ const ScheduleComponent = z.object({
 const ChecklistComponent = z.object({
   type: z.literal("checklist"),
   id: z.string(),
+  tab,
   title: z.string(),
   repeat: z.enum(["none", "daily", "weekly"]).default("none"),
   items: z.array(z.object({ id: z.string(), label: z.string() })),
@@ -41,6 +48,7 @@ const ChecklistComponent = z.object({
 const MetricComponent = z.object({
   type: z.literal("metric"),
   id: z.string(),
+  tab,
   metricKey: z.string(), // referenced by logEntry + app_logs.metric_key
   title: z.string(),
   unit: z.string().optional(),
@@ -53,6 +61,7 @@ const MetricComponent = z.object({
 const LogEntryComponent = z.object({
   type: z.literal("logEntry"),
   id: z.string(),
+  tab,
   title: z.string(),
   metricKey: z.string(), // ties the logged value to a MetricComponent.key
   // When true, the runtime offers "Import from photo" — Claude vision reads a
@@ -62,7 +71,7 @@ const LogEntryComponent = z.object({
     z.object({
       key: z.string(),
       label: z.string(),
-      kind: z.enum(["number", "text", "duration"]).default("number"),
+      kind: z.enum(["number", "text", "duration", "date"]).default("number"),
       unit: z.string().optional(),
     })
   ),
@@ -71,6 +80,7 @@ const LogEntryComponent = z.object({
 const ReminderComponent = z.object({
   type: z.literal("reminder"),
   id: z.string(),
+  tab,
   title: z.string(),
   body: z.string(),
   days: z.array(DayEnum).min(1),

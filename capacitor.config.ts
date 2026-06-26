@@ -10,7 +10,7 @@ import type { CapacitorConfig } from "@capacitor/cli";
  * `allowNavigation` must include the Supabase auth host so OAuth/email
  * confirmation redirects stay inside the app instead of bouncing to Safari.
  */
-const serverUrl = process.env.CAP_SERVER_URL || "https://shelf.vercel.app";
+const serverUrl = process.env.CAP_SERVER_URL || "https://app2app-khaki.vercel.app";
 
 const config: CapacitorConfig = {
   appId: "app.shelf.mobile",

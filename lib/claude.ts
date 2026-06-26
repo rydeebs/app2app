@@ -20,18 +20,28 @@ AppSpec shape:
 }
 
 Component types (use "type" as the discriminator). Every component needs a unique short "id".
-1. markdown   { type, id, title?, content }                      // reference text from the plan
-2. schedule   { type, id, title, items:[{id,date(YYYY-MM-DD),title,detail?}] }  // dated plan items
-3. checklist  { type, id, title, repeat:"none"|"daily"|"weekly", items:[{id,label}] }
-4. metric     { type, id, metricKey, title, unit?, start?, goal?, direction:"increase"|"decrease" }
+Every component may also include an optional "tab" string (see Tabs below).
+1. markdown   { type, id, tab?, title?, content }                // reference text from the plan
+2. schedule   { type, id, tab?, title, items:[{id,date(YYYY-MM-DD),title,detail?}] }  // dated plan items
+3. checklist  { type, id, tab?, title, repeat:"none"|"daily"|"weekly", items:[{id,label}] }
+4. metric     { type, id, tab?, metricKey, title, unit?, start?, goal?, direction:"increase"|"decrease" }
               // direction "decrease" => lower is better (e.g. running pace, weight)
               // for time/pace values set unit to "duration" and express start/goal in seconds
-5. logEntry   { type, id, title, metricKey, photoImport?:boolean, fields:[{key,label,kind:"number"|"text"|"duration",unit?}] }
+5. logEntry   { type, id, tab?, title, metricKey, photoImport?:boolean, fields:[{key,label,kind:"number"|"text"|"duration"|"date",unit?}] }
               // metricKey MUST match a metric component's "metricKey"; lets the user record progress
+              // field kind "date" renders a calendar picker (value "YYYY-MM-DD") — use it whenever a
+              // log needs the user to pick a specific day.
               // set photoImport:true for fitness/run-style logs whose stats can be read off a
               // phone screenshot (Strava/Apple Fitness/Garmin) — the runtime lets the user import
-              // a photo and auto-fills these fields.
-6. reminder   { type, id, title, body, days:["mon".."sun"], time:"HH:MM" (24h) }
+              // one or more photos and auto-fills these fields.
+6. reminder   { type, id, tab?, title, body, days:["mon".."sun"], time:"HH:MM" (24h) }
+
+Tabs (for a cleaner layout):
+- Give every component a short "tab" label so the runtime groups them into a tab bar instead of one
+  long scroll. Use 2-4 distinct tabs total (e.g. "Today", "Progress", "Plan", "Guide").
+- Keep related components in the same tab (e.g. metric + its logEntry together under "Progress";
+  reference markdown under "Guide"; schedule/checklist under "Plan").
+- Use the SAME exact spelling for tabs that belong together. Tabs are optional for very small apps.
 
 Rules:
 - Always include at least one metric + one logEntry so the user can track progress toward the goal.
@@ -142,24 +152,35 @@ export type ExtractField = { key: string; label: string; kind: string; unit?: st
  * logEntry fields. Returns a { fieldKey: stringValue } map suitable for pre-filling
  * the runtime inputs. Values are strings; durations are "mm:ss", numbers are plain.
  */
+type ExtractImage = { base64: string; mediaType: "image/jpeg" | "image/png" | "image/webp" };
+
 export async function extractFieldsFromImage(
   fields: ExtractField[],
-  imageBase64: string,
-  mediaType: "image/jpeg" | "image/png" | "image/webp"
+  images: ExtractImage[]
 ): Promise<Record<string, string>> {
   const fieldList = fields
     .map((f) => `- "${f.key}" (${f.label}${f.unit ? `, ${f.unit}` : ""}): ${f.kind}`)
     .join("\n");
 
-  const instruction = `This image is a screenshot from a fitness/activity tracker. Read the stats and return JSON mapping each field key to its value as a string.
+  const multiple = images.length > 1;
+  const instruction = `${
+    multiple
+      ? "These images are photos/screenshots of the same activity or log. Combine the information across all of them; if a value appears in more than one image, prefer the clearest reading."
+      : "This image is a screenshot from a fitness/activity tracker."
+  } Read the stats and return JSON mapping each field key to its value as a string.
 
 Fields:
 ${fieldList}
 
 Output rules:
 - Return ONLY a JSON object of { fieldKey: stringValue }.
-- For "duration" fields use "mm:ss" (or "h:mm:ss"). For "number" fields use a plain number like "3.1". For "text" fields use the text.
-- Omit any field whose value is not clearly visible in the image. Never guess.`;
+- For "duration" fields use "mm:ss" (or "h:mm:ss"). For "number" fields use a plain number like "3.1". For "date" fields use "YYYY-MM-DD". For "text" fields use the text.
+- Omit any field whose value is not clearly visible. Never guess.`;
+
+  const imageBlocks = images.map((img) => ({
+    type: "image" as const,
+    source: { type: "base64" as const, media_type: img.mediaType, data: img.base64 },
+  }));
 
   const msg = await client().messages.create({
     model: MODEL,
@@ -168,10 +189,7 @@ Output rules:
     messages: [
       {
         role: "user",
-        content: [
-          { type: "image", source: { type: "base64", media_type: mediaType, data: imageBase64 } },
-          { type: "text", text: instruction },
-        ],
+        content: [...imageBlocks, { type: "text", text: instruction }],
       },
     ],
   });

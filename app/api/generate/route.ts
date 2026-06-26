@@ -49,9 +49,13 @@ export async function POST(req: Request) {
     // and inject our single activity reminder.
     const alertTime = TIME_RE.test(body.alertTime ?? "") ? body.alertTime! : "08:00";
     spec.components = spec.components.filter((c) => c.type !== "reminder");
+    // If the model grouped components into tabs, attach the injected reminder to
+    // the last used tab so it doesn't spawn an orphan tab of its own.
+    const lastTab = [...spec.components].reverse().find((c) => c.tab)?.tab;
     spec.components.push({
       type: "reminder",
       id: "activity-alert",
+      tab: lastTab,
       title: spec.name,
       body: `You've got ${spec.name} today — open it and keep your streak.`,
       days: activeWeekdays(spec),
