@@ -1,12 +1,14 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import Link from "next/link";
 import { useAppData } from "./useAppData";
 import { MarkdownBlock } from "./MarkdownBlock";
 import { ScheduleBlock } from "./ScheduleBlock";
 import { ChecklistBlock } from "./ChecklistBlock";
 import { MetricBlock } from "./MetricBlock";
 import { LogEntryBlock } from "./LogEntryBlock";
+import { PlanBlock } from "./PlanBlock";
 import { ReminderBlock } from "./ReminderBlock";
 import type { AppSpec, AppComponent } from "@/lib/appSpec";
 import type { LogRow } from "./useAppData";
@@ -36,6 +38,13 @@ export function AppRenderer({ appId, spec }: { appId: string; spec: AppSpec }) {
 
   return (
     <div className="mx-auto max-w-xl space-y-4 px-4 pb-24 pt-6">
+      <Link
+        href="/"
+        className="inline-flex items-center gap-1 px-1 text-sm text-muted transition hover:text-foreground"
+      >
+        ‹ Your apps
+      </Link>
+
       <header className="mb-2 flex items-center gap-3 px-1">
         <span
           className="flex h-12 w-12 items-center justify-center rounded-2xl text-2xl"
@@ -101,6 +110,8 @@ function renderBlock(
         <LogEntryBlock key={c.id} {...c} logs={logs} addLog={addLog} metricUnit={metricUnit} />
       );
     }
+    case "plan":
+      return <PlanBlock key={c.id} {...c} logs={logs} addLog={addLog} />;
     case "reminder":
       return <ReminderBlock key={c.id} {...c} />;
     default:

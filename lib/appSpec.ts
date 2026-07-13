@@ -77,6 +77,29 @@ const LogEntryComponent = z.object({
   ),
 });
 
+const PlanComponent = z.object({
+  type: z.literal("plan"),
+  id: z.string(),
+  tab,
+  title: z.string(),
+  // A multi-week program. The runtime renders a week selector; each week keeps
+  // its own checkmarks + notes, saved independently via per-week metric_keys.
+  weeks: z
+    .array(
+      z.object({
+        number: z.number(), // 1-indexed week number
+        theme: z.string().optional(), // phase/theme badge, e.g. "Recovery week"
+        days: z.array(
+          z.object({
+            day: z.string(), // "Mon", "Tue", … (free label)
+            items: z.array(z.string()), // workout/task lines for that day
+          })
+        ),
+      })
+    )
+    .min(1),
+});
+
 const ReminderComponent = z.object({
   type: z.literal("reminder"),
   id: z.string(),
@@ -93,6 +116,7 @@ export const ComponentSchema = z.discriminatedUnion("type", [
   ChecklistComponent,
   MetricComponent,
   LogEntryComponent,
+  PlanComponent,
   ReminderComponent,
 ]);
 

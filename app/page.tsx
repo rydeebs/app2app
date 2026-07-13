@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { SignOutButton } from "@/components/SignOutButton";
 import { DeleteAccountButton } from "@/components/DeleteAccountButton";
+import { AppGrid } from "@/components/AppGrid";
 
 export default async function Hub() {
   const supabase = await createClient();
@@ -39,33 +40,7 @@ export default async function Hub() {
         + Build a new app from a plan
       </Link>
 
-      {!apps?.length ? (
-        <p className="text-center text-sm text-muted">
-          No apps yet. Paste a plan to create your first one.
-        </p>
-      ) : (
-        <ul className="grid grid-cols-2 gap-3">
-          {apps.map((app) => {
-            const icon = (app.icon ?? {}) as { emoji?: string; color?: string };
-            return (
-              <li key={app.id}>
-                <Link
-                  href={`/a/${app.id}`}
-                  className="flex h-full flex-col gap-3 rounded-2xl border border-border bg-surface p-4 transition hover:border-primary/40"
-                >
-                  <span
-                    className="flex h-12 w-12 items-center justify-center rounded-2xl text-2xl"
-                    style={{ background: (icon.color || "#9b86d4") + "22" }}
-                  >
-                    {icon.emoji || "📦"}
-                  </span>
-                  <span className="font-medium text-foreground">{app.name}</span>
-                </Link>
-              </li>
-            );
-          })}
-        </ul>
-      )}
+      <AppGrid apps={apps ?? []} />
 
       <div className="mt-10 flex justify-end border-t border-border pt-4">
         <DeleteAccountButton />

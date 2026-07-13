@@ -35,6 +35,20 @@ Every component may also include an optional "tab" string (see Tabs below).
               // phone screenshot (Strava/Apple Fitness/Garmin) — the runtime lets the user import
               // one or more photos and auto-fills these fields.
 6. reminder   { type, id, tab?, title, body, days:["mon".."sun"], time:"HH:MM" (24h) }
+7. plan       { type, id, tab?, title, weeks:[{ number, theme?, days:[{ day, items:[string] }] }] }
+              // a multi-week program. Renders a week selector (dropdown + prev/next) where each
+              // week is its own schedule with its OWN saved checkmarks, progress bar, and notes.
+
+Multi-week programs:
+- For ANY plan that spans multiple weeks (training programs, courses, challenges, bootcamps), emit
+  ONE "plan" component with a "weeks" array — one entry per week, each carrying its own "days" and
+  "items". Do NOT flatten the weeks into a dated "schedule", and do NOT create one tab per week
+  (the built-in week selector handles navigation).
+- Give EACH week all seven days in order — "Mon","Tue","Wed","Thu","Fri","Sat","Sun" — even rest
+  days (use an item like "Rest — light walk / mobility"). Never truncate a week to just a few days.
+- Put each session/task as a plain string in "items". Set "theme" to that week's focus or phase when
+  the plan has one (e.g. "Recovery week").
+- Give the whole plan a single tab such as "Plan".
 
 Tabs (for a cleaner layout):
 - Give every component a short "tab" label so the runtime groups them into a tab bar instead of one
