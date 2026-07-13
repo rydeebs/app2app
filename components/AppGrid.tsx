@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 
@@ -15,18 +15,6 @@ export function AppGrid({ apps: initialApps }: { apps: AppCard[] }) {
   const [apps, setApps] = useState(initialApps);
   const [editMode, setEditMode] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
-  const pressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  function startPress() {
-    if (editMode) return;
-    pressTimer.current = setTimeout(() => setEditMode(true), 500);
-  }
-  function cancelPress() {
-    if (pressTimer.current) {
-      clearTimeout(pressTimer.current);
-      pressTimer.current = null;
-    }
-  }
 
   async function remove(app: AppCard) {
     if (busyId) return;
@@ -58,17 +46,19 @@ export function AppGrid({ apps: initialApps }: { apps: AppCard[] }) {
 
   return (
     <>
-      {editMode ? (
-        <div className="mb-3 flex items-center justify-between px-1">
-          <span className="text-sm text-muted">Tap ✕ to delete an app</span>
-          <button
-            onClick={() => setEditMode(false)}
-            className="rounded-full bg-primary px-4 py-1.5 text-sm font-medium text-primary-ink"
-          >
-            Done
-          </button>
-        </div>
-      ) : null}
+      <div className="mb-3 flex items-center justify-between px-1">
+        <span className="text-sm text-muted">{editMode ? "Tap ✕ to delete an app" : ""}</span>
+        <button
+          onClick={() => setEditMode((v) => !v)}
+          className={
+            editMode
+              ? "rounded-full bg-primary px-4 py-1.5 text-sm font-medium text-primary-ink"
+              : "rounded-full border border-border px-4 py-1.5 text-sm font-medium text-muted transition hover:text-foreground"
+          }
+        >
+          {editMode ? "Done" : "Remove app"}
+        </button>
+      </div>
 
       <ul className="grid grid-cols-2 gap-3">
         {apps.map((app) => {
@@ -91,11 +81,9 @@ export function AppGrid({ apps: initialApps }: { apps: AppCard[] }) {
                 onClick={(e) => {
                   if (editMode) e.preventDefault();
                 }}
-                onPointerDown={startPress}
-                onPointerUp={cancelPress}
-                onPointerLeave={cancelPress}
-                onPointerCancel={cancelPress}
                 onContextMenu={(e) => e.preventDefault()}
+                // Suppress the iOS long-press link preview (the "Vercel page" popup).
+                style={{ WebkitTouchCallout: "none" }}
                 className={
                   "flex h-full select-none flex-col gap-3 rounded-2xl border border-border bg-surface p-4 transition hover:border-primary/40 " +
                   (editMode ? "animate-[wiggle_0.3s_ease-in-out_infinite]" : "")

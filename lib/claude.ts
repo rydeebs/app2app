@@ -80,7 +80,56 @@ function extractJson(text: string): unknown {
   return JSON.parse(raw.slice(start, end + 1));
 }
 
-export type ClarifyingQuestion = { key: string; question: string };
+export type QuestionType =
+  | "select"
+  | "multiselect"
+  | "date"
+  | "daterange"
+  | "number"
+  | "text";
+
+export type ClarifyingQuestion = {
+  key: string;
+  question: string;
+  type: QuestionType;
+  options?: string[]; // for select / multiselect
+  unit?: string; // for number (e.g. "miles", "lbs")
+};
+
+const QUESTION_TYPES: QuestionType[] = [
+  "select",
+  "multiselect",
+  "date",
+  "daterange",
+  "number",
+  "text",
+];
+
+// Coerce a raw model-emitted question into a valid, renderable shape. Unknown
+// types fall back to free text; choice types without real options degrade to text.
+function normalizeQuestion(raw: unknown): ClarifyingQuestion | null {
+  if (typeof raw !== "object" || raw === null) return null;
+  const q = raw as Record<string, unknown>;
+  const key = typeof q.key === "string" ? q.key : "";
+  const question = typeof q.question === "string" ? q.question : "";
+  if (!key || !question) return null;
+
+  let type: QuestionType = QUESTION_TYPES.includes(q.type as QuestionType)
+    ? (q.type as QuestionType)
+    : "text";
+
+  let options: string[] | undefined;
+  if (type === "select" || type === "multiselect") {
+    options = Array.isArray(q.options)
+      ? q.options.filter((o): o is string => typeof o === "string" && o.trim().length > 0).slice(0, 8)
+      : undefined;
+    if (!options || options.length < 2) type = "text"; // not enough choices to be a picklist
+  }
+
+  const unit = type === "number" && typeof q.unit === "string" ? q.unit : undefined;
+
+  return { key, question, type, ...(options ? { options } : {}), ...(unit ? { unit } : {}) };
+}
 
 export async function generateQuestions(
   md: string
@@ -93,15 +142,30 @@ export async function generateQuestions(
     messages: [
       {
         role: "user",
-        content: `Here is a plan in Markdown:\n\n<plan>\n${md}\n</plan>\n\nReturn JSON: { "suggestedName": string, "questions": [{ "key": string, "question": string }] }. Ask 2-4 short clarifying questions (e.g. start date, goal date, available days, units). Return JSON only.`,
+        content: `Here is a plan in Markdown:\n\n<plan>\n${md}\n</plan>\n\nReturn JSON: { "suggestedName": string, "questions": ClarifyingQuestion[] } where each question is { "key": string, "question": string, "type": "select"|"multiselect"|"date"|"daterange"|"number"|"text", "options"?: string[], "unit"?: string }.
+
+Ask 2-4 short clarifying questions and pick the BEST input type for each so the user taps instead of typing:
+- "date" for a single date/deadline (e.g. race day, exam date).
+- "daterange" for a span (e.g. the training window, program start-to-end).
+- "select" for a fixed set of choices (e.g. goal type, experience level, units) — give 3-6 "options".
+- "multiselect" for choosing several (e.g. which days of the week you train) — give the "options" (use Mon,Tue,Wed,Thu,Fri,Sat,Sun for weekdays).
+- "number" for a quantity, with a "unit" (e.g. "miles", "lbs", "minutes").
+- "text" ONLY when none of the above fit.
+Options must be concrete recognizable values. Return JSON only.`,
       },
     ],
   });
   const text = msg.content.filter((b) => b.type === "text").map((b) => b.text).join("");
-  const parsed = extractJson(text) as { suggestedName?: string; questions?: ClarifyingQuestion[] };
+  const parsed = extractJson(text) as { suggestedName?: string; questions?: unknown[] };
+  const questions = Array.isArray(parsed.questions)
+    ? parsed.questions
+        .map(normalizeQuestion)
+        .filter((q): q is ClarifyingQuestion => q !== null)
+        .slice(0, 4)
+    : [];
   return {
     suggestedName: parsed.suggestedName || "My Plan",
-    questions: Array.isArray(parsed.questions) ? parsed.questions.slice(0, 4) : [],
+    questions,
   };
 }
 

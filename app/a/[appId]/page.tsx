@@ -4,6 +4,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { AppSpecSchema } from "@/lib/appSpec";
+import { isHtmlApp } from "@/lib/htmlApp";
 import { AppRenderer } from "@/components/runtime/AppRenderer";
 import { InstallPrompt } from "@/components/InstallPrompt";
 
@@ -56,6 +57,31 @@ export default async function AppPage({
     .single();
 
   if (!app) notFound();
+
+  // Imported HTML apps render verbatim in a sandboxed iframe rather than through
+  // the AppSpec runtime. allow-same-origin is required for the file's own
+  // localStorage to work; the /raw route that feeds it is owner-gated.
+  if (isHtmlApp(app.app_spec)) {
+    return (
+      <main className="flex min-h-screen flex-col">
+        <div className="px-4 py-3">
+          <Link
+            href="/"
+            className="inline-flex items-center gap-1 text-sm text-muted transition hover:text-foreground"
+          >
+            ‹ Your apps
+          </Link>
+        </div>
+        <iframe
+          src={`/a/${app.id}/raw`}
+          title="Imported app"
+          sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
+          className="h-[calc(100vh-3rem)] w-full border-0"
+        />
+        <InstallPrompt />
+      </main>
+    );
+  }
 
   const parsed = AppSpecSchema.safeParse(app.app_spec);
   if (!parsed.success) {
