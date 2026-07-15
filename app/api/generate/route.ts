@@ -7,7 +7,9 @@ import type { DayKey } from "@/lib/appSpec";
 const TIME_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
 
 export const runtime = "nodejs";
-export const maxDuration = 60;
+// Large multi-week plans can take longer than a minute to generate; give the
+// function headroom so it finishes instead of being killed mid-generation.
+export const maxDuration = 300;
 
 export async function POST(req: Request) {
   const supabase = await createClient();

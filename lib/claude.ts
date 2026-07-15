@@ -178,14 +178,28 @@ export async function generateAppSpec(
     .map(([k, v]) => `- ${k}: ${v}`)
     .join("\n");
 
-  const userContent = `${SPEC_GUIDE}\n\nToday's date is ${today}.\n\n<plan>\n${md}\n</plan>\n\nUser answers to clarifying questions:\n${answersText || "(none)"}\n\nReturn ONLY the AppSpec JSON.`;
+  const userContent = `Today's date is ${today}.\n\n<plan>\n${md}\n</plan>\n\nUser answers to clarifying questions:\n${answersText || "(none)"}\n\nReturn ONLY the AppSpec JSON.`;
 
-  const first = await client().messages.create({
-    model: MODEL,
-    max_tokens: 4096,
-    system: "You output strictly valid AppSpec JSON and nothing else.",
-    messages: [{ role: "user", content: userContent }],
-  });
+  // Cache the large static spec guide as a shared prefix so the repair pass and
+  // any subsequent builds within a few minutes reuse it (lower latency + cost).
+  const guideBlock = {
+    type: "text" as const,
+    text: SPEC_GUIDE,
+    cache_control: { type: "ephemeral" as const },
+  };
+
+  // A full multi-week plan can be large. A too-small token cap truncated the JSON,
+  // which failed validation and forced a slow, wasteful second (repair) call — the
+  // main cause of long "building" waits. A generous cap lets the first pass finish
+  // in one shot, and streaming keeps the long request alive instead of buffering.
+  const first = await client()
+    .messages.stream({
+      model: MODEL,
+      max_tokens: 16000,
+      system: [guideBlock, { type: "text", text: "You output strictly valid AppSpec JSON and nothing else." }],
+      messages: [{ role: "user", content: userContent }],
+    })
+    .finalMessage();
   let text = first.content.filter((b) => b.type === "text").map((b) => b.text).join("");
 
   let candidate: unknown;
@@ -198,23 +212,25 @@ export async function generateAppSpec(
   if (result.success) return result.data;
 
   // One repair pass: hand the validation errors back to the model.
-  const repair = await client().messages.create({
-    model: MODEL,
-    max_tokens: 4096,
-    system: "You fix AppSpec JSON to satisfy the schema. Output ONLY corrected JSON.",
-    messages: [
-      { role: "user", content: userContent },
-      { role: "assistant", content: text },
-      {
-        role: "user",
-        content: `That JSON failed validation with these errors:\n${JSON.stringify(
-          result.error.issues,
-          null,
-          2
-        )}\nReturn corrected AppSpec JSON only.`,
-      },
-    ],
-  });
+  const repair = await client()
+    .messages.stream({
+      model: MODEL,
+      max_tokens: 16000,
+      system: [guideBlock, { type: "text", text: "You fix AppSpec JSON to satisfy the schema. Output ONLY corrected JSON." }],
+      messages: [
+        { role: "user", content: userContent },
+        { role: "assistant", content: text },
+        {
+          role: "user",
+          content: `That JSON failed validation with these errors:\n${JSON.stringify(
+            result.error.issues,
+            null,
+            2
+          )}\nReturn corrected AppSpec JSON only.`,
+        },
+      ],
+    })
+    .finalMessage();
   text = repair.content.filter((b) => b.type === "text").map((b) => b.text).join("");
   result = AppSpecSchema.safeParse(extractJson(text));
   if (!result.success) {

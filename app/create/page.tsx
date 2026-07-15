@@ -261,18 +261,33 @@ export default function CreatePage() {
   async function build() {
     setError("");
     setStep("building");
-    const res = await fetch("/api/generate", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ md, answers, alertTime }),
-    });
-    const data = await res.json();
-    if (!res.ok) {
-      setError(data.error || "Generation failed");
+    // Guard against a hung request so the user never sees an infinite spinner.
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 180000);
+    try {
+      const res = await fetch("/api/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ md, answers, alertTime }),
+        signal: controller.signal,
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || "Generation failed");
+        setStep("questions");
+        return;
+      }
+      router.push(`/a/${data.appId}`);
+    } catch (err) {
+      setError(
+        err instanceof DOMException && err.name === "AbortError"
+          ? "That took too long. Try again, or trim the plan a little."
+          : "Network error — please try again."
+      );
       setStep("questions");
-      return;
+    } finally {
+      clearTimeout(timeout);
     }
-    router.push(`/a/${data.appId}`);
   }
 
   return (
@@ -410,7 +425,10 @@ export default function CreatePage() {
       {step === "building" && (
         <div className="py-20 text-center">
           <p className="font-serif-italic text-xl text-foreground">Building your app…</p>
-          <p className="mt-2 text-sm text-muted">Shaping your plan into something you can tap.</p>
+          <p className="mt-2 text-sm text-muted">
+            Shaping your plan into something you can tap. Bigger, multi-week plans can take up to a
+            minute.
+          </p>
         </div>
       )}
     </main>
